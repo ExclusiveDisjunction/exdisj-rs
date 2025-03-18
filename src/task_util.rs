@@ -7,6 +7,7 @@ use std::{
     sync::Arc
 };
 
+use futures::future::BoxFuture;
 use tokio::{
     select,
     sync::mpsc::{
@@ -143,7 +144,7 @@ pub trait StartableTask: TaskBasis where Self: Sized {
         /// Spanws a task using `tokio::spawn`, and establishes communication between the tasks and this thread.
         fn start<F, Fut>(func: Arc<F>, buffer_size: usize) -> Self where
             Self: Sized,
-            F: Fn(Self::Arg) -> Fut + Send + Sync + 'static,
+            F: Fn(Self::Arg) -> Fut + Send + Sync + 'static + ?Sized,
             Fut: Future<Output = Self::Output> + Send + 'static;
 
         fn start_owned<F, Fut>(func: F, buffer_size: usize) -> Self where 
@@ -161,7 +162,7 @@ pub trait StartableTask: TaskBasis where Self: Sized {
 /// Otherwise, it will restart the task, if it was dead. If it was dead, this will return `RestartStatus::WasDead`, otherwise, `RestartStatus::Ok`.
 pub async fn restart<T, F, Fut>(task: &mut T, func: Arc<F>, buffer_size: usize) -> RestartStatus<T::Output> where
     T: StartableTask,
-    F: Fn(T::Arg) -> Fut + Send + Sync + 'static,
+    F: Fn(T::Arg) -> Fut + Send + Sync + 'static + ?Sized,
     Fut: Future<Output = T::Output> + Send + 'static,
     T::Output: RestartStatusBase {
         if task.is_running() {
@@ -203,21 +204,18 @@ pub async fn restart_owned<T, F, Fut>(task: &mut T, func: F, buffer_size: usize)
 }
 
 /// A wrapper around a task that can be restarted. It requires that the task is a `StartableTask`. It will keep track of how many times the task will be restarted.
-pub struct RestartableTask<Task, F, Fut>
+pub struct RestartableTask<Task>
     where Task: StartableTask,
-    F: Fn(Task::Arg) -> Fut + Send + 'static,
-    Fut: Future<Output=Task::Output> + Send + 'static  {
+    Task::Output: RestartStatusBase {
         task: Task,
-        func: Arc<F>,
+        func: Arc<dyn Fn(Task::Arg) -> BoxFuture<'static, Task::Output> + Send + Sync>,
         restart_count: u8,
         max_restart: u8,
-        buff_size: usize,
-        _mark: PhantomData<Fut>
+        buff_size: usize
 }
-impl<Task, F, Fut> TaskBasis for RestartableTask<Task, F, Fut>
+impl<Task> TaskBasis for RestartableTask<Task>
     where Task: StartableTask,
-    F: Fn(Task::Arg) -> Fut + Send + 'static,
-    Fut: Future<Output=Task::Output> + Send + 'static  {
+    Task::Output: RestartStatusBase  {
         type Arg = Task::Arg;
         type Msg = Task::Msg;
         type Output = Task::Output;
@@ -235,10 +233,9 @@ impl<Task, F, Fut> TaskBasis for RestartableTask<Task, F, Fut>
             self.task.sender()
         }
 }
-impl<Task, F, Fut> RecvTaskBasis for RestartableTask<Task, F, Fut>
+impl<Task> RecvTaskBasis for RestartableTask<Task>
     where Task: StartableTask + RecvTaskBasis,
-    F: Fn(Task::Arg) -> Fut + Send + 'static,
-    Fut: Future<Output=Task::Output> + Send + 'static {
+    Task::Output: RestartStatusBase {
         fn receiver(&self) -> &Receiver<Self::Msg> {
             self.task.receiver()
         }
@@ -246,16 +243,16 @@ impl<Task, F, Fut> RecvTaskBasis for RestartableTask<Task, F, Fut>
             self.task.receiver_mut()
         }
     }
-impl<Task, F, Fut> RestartableTask<Task, F, Fut>
+impl<Task> RestartableTask<Task>
     where Task: StartableTask,
-    Task::Output: RestartStatusBase,
-    F: Fn(Task::Arg) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output=Task::Output> + Send + 'static {
+    Task::Output: RestartStatusBase {
 
         /// Establishes a restartable task with a specific `max_restart` value.
         /// # Panics
         /// If `max_restart` or `buffer_size` is `0`, this will panic.
-        pub fn start(func: F, buffer_size: usize, max_restart: u8) -> Self {
+        pub fn start<F, Fut>(func: F, buffer_size: usize, max_restart: u8) -> Self 
+            where F: Fn(Task::Arg) -> Fut + Send + Sync + 'static, 
+            Fut: Future<Output=Task::Output> + Send + 'static {
                 if max_restart == 0 || buffer_size == 0 {
                     panic!("The max restart cannot be zero.");
                 }
@@ -266,11 +263,13 @@ impl<Task, F, Fut> RestartableTask<Task, F, Fut>
 
                 Self {
                     task,
-                    func,
+                    func: Arc::new(move |arg: Task::Arg| {
+                        let fut = (func)(arg);
+                        Box::pin(fut)
+                    }),
                     restart_count: 0,
                     buff_size: buffer_size,
-                    max_restart,
-                    _mark: PhantomData::default()
+                    max_restart
                 }
         }
 
@@ -419,7 +418,7 @@ impl<T, O> TaskBasis for DuplexTask<T, O> where T: Send + 'static, O: Send + 'st
 impl<T, O> StartableTask for DuplexTask<T, O> where T: Send + 'static, O: Send + 'static {
     fn start<F, Fut>(func: Arc<F>, buffer_size: usize) -> Self
             where Self: Sized,
-            F: Fn(Self::Arg) -> Fut + Send + Sync + 'static,
+            F: Fn(Self::Arg) -> Fut + Send + Sync + 'static + ?Sized,
             Fut: Future<Output = Self::Output> + Send + 'static {
         
         let (my_sender, their_recv) = channel::<Self::Msg>(buffer_size);
@@ -481,7 +480,7 @@ impl<T, O> TaskBasis for SimplexTask<T, O> where T: Send + 'static, O: Send + 's
 impl<T, O> StartableTask for SimplexTask<T, O> where T: Send + 'static, O: Send + 'static {
     fn start<F, Fut>(func: Arc<F>, buffer_size: usize) -> Self
             where Self: Sized,
-            F: Fn(Receiver<T>) -> Fut + Send + Sync + 'static,
+            F: Fn(Receiver<T>) -> Fut + Send + Sync + 'static + ?Sized,
             Fut: Future<Output = O> + Send + 'static {
         
         let (my_sender, their_recv) = channel::<T>(buffer_size);
@@ -644,6 +643,6 @@ mod test {
     fn test_func_syntax() {
         let _task = SimplexTask::start_owned(test_func, 10);
 
-        let _rtask: RestartableTask<SimplexTask<_, _>, _, _> = RestartableTask::start(test_func, 10, 4);
+        let _rtask: RestartableTask<SimplexTask<_, _>> = RestartableTask::start(test_func, 10, 4);
     }
 }
