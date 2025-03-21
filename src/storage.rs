@@ -1,24 +1,30 @@
-use std::marker::PhantomData;
+use std::{alloc::{alloc, dealloc, Layout}, marker::PhantomData, ops::{Index, IndexMut}, ptr::null};
 
-pub struct LimitedQueue<T> where T: Default + Clone {
-    data: Vec<T>,
+pub struct LimitedQueue<T> where T: Sized{
+    data: *mut T, 
+    capacity: usize, 
     p: usize,
     count: usize
 }
-impl<T> LimitedQueue<T> where T: Default + Clone {
+impl<T> LimitedQueue<T> where T: Sized {
     pub fn new(capacity: usize) -> Self {
         if capacity == 0 {
             panic!("The capacity cannot be zero.")
         }
+
+        let layout = Layout::array::<T>(capacity).expect("Unable to get layout of object");
+        let ptr: *mut T = unsafe { alloc(layout) as *mut T };
+
         Self {
-            data: vec![T::default(); capacity],
+            data: ptr,
             p: 0,
+            capacity,
             count: 0
         }
     }
 
     pub fn capacity(&self) -> usize {
-        self.data.len()
+        self.capacity
     }
     pub fn len(&self) -> usize {
         self.count
@@ -27,7 +33,7 @@ impl<T> LimitedQueue<T> where T: Default + Clone {
         self.count == 0
     }
     pub fn is_full(&self) -> bool {
-        self.count >= self.capacity()
+        self.count == self.capacity
     }
 
     pub fn front_index(&self) -> Option<usize> {
@@ -53,19 +59,40 @@ impl<T> LimitedQueue<T> where T: Default + Clone {
         }
     }
 
+    pub fn get_at(&self, index: usize) -> Option<&T> {
+        let front = self.front_index()?;
+
+        if index >= self.count {
+            return None;
+        }
+
+        let target_index = (index + front) % self.capacity;
+        
+        unsafe { self.data.add(target_index).as_ref() }
+    }
+    pub fn get_at_mut(&mut self, index: usize) -> Option<&mut T> {
+        let front = self.front_index()?;
+
+        if index >= self.count {
+            return None;
+        }
+
+        let target_index = (index + front) % self.capacity;
+        
+        unsafe { self.data.add(target_index).as_mut() }
+    }
+
     pub fn front(&self) -> Option<&T> {
-        self.data.get(self.front_index()?)
+        self.get_at(0)
     }
     pub fn front_mut(&mut self) -> Option<&mut T> {
-        let index = self.front_index()?;
-        self.data.get_mut(index)
+        self.get_at_mut(0)
     }
     pub fn back(&self) -> Option<&T> {
-        self.data.get(self.back_index()?)
+        self.get_at(self.count - 1)
     }
     pub fn back_mut(&mut self) -> Option<&mut T> {
-        let index = self.back_index()?;
-        self.data.get_mut(index)
+        self.get_at_mut(self.count - 1)
     }
 
     pub fn clear(&mut self) {
@@ -78,7 +105,7 @@ impl<T> LimitedQueue<T> where T: Default + Clone {
         let will_return = self.is_full();
 
         // First set the value at the back index to be the new value.
-        let curr_at_pos: &mut T = self.data.get_mut(self.p)?;
+        let curr_at_pos: &mut T = self.get_at_mut(self.p)?;
         let result = std::mem::replace(curr_at_pos, val);
 
         // Update the back
@@ -102,19 +129,41 @@ impl<T> LimitedQueue<T> where T: Default + Clone {
         LimitedQueueIterMut::new(self)
     }
     pub fn get(&self, n: usize) -> Vec<&T> {
-        self.data.iter().take(n).collect()
+        self.iter().take(n).collect()
     }
     pub fn get_mut(&mut self, n: usize) -> Vec<&mut T> {
-        self.data.iter_mut().take(n).collect()
+        self.iter_mut().take(n).collect()
+    }
+}
+impl<T> Index<usize> for LimitedQueue<T> where T: Sized {
+    type Output = T;
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get_at(index).expect("Index out of bounds")
+    }
+}
+impl<T> IndexMut<usize> for LimitedQueue<T> where T: Sized {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_at_mut(index).expect("Index out of bounds")
+    }
+}
+impl<T> Drop for LimitedQueue<T> where T: Sized {
+    fn drop(&mut self) {
+        if !self.data.is_null() {
+            let layout = Layout::array::<T>(self.capacity).expect("Unable to get layout of object");
+            unsafe {
+                dealloc(self.data as *mut u8, layout);
+                self.data = null::<T>() as *mut u8 as *mut T;
+            }
+        }
     }
 }
 
-pub struct LimitedQueueIter<'a, T> where T: Default + Clone {
+pub struct LimitedQueueIter<'a, T> where T: Sized {
     data: &'a LimitedQueue<T>,
     p: Option<usize>,
     b: Option<usize>
 }
-impl<'a, T> Iterator for LimitedQueueIter<'a, T> where T: Default + Clone {
+impl<'a, T> Iterator for LimitedQueueIter<'a, T> where T: Sized {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -129,10 +178,10 @@ impl<'a, T> Iterator for LimitedQueueIter<'a, T> where T: Default + Clone {
             self.p = Some(next)
         }
 
-        self.data.data.get(curr)
+        self.data.get_at(curr)
     }
 }
-impl<'a, T> LimitedQueueIter<'a, T> where T: Default + Clone {
+impl<'a, T> LimitedQueueIter<'a, T> where T: Sized {
     pub fn new(parent: &'a LimitedQueue<T>) -> Self {
         Self {
             data: parent,
@@ -142,7 +191,7 @@ impl<'a, T> LimitedQueueIter<'a, T> where T: Default + Clone {
     }
 }
 
-pub struct LimitedQueueIterMut<'a, T> where T: Default + Clone {
+pub struct LimitedQueueIterMut<'a, T> where T: Sized {
     data: *mut T,
     p: Option<usize>,
     b: Option<usize>,
@@ -150,7 +199,7 @@ pub struct LimitedQueueIterMut<'a, T> where T: Default + Clone {
     len: usize,
     marker: std::marker::PhantomData<&'a mut T>
 }
-impl<'a, T> Iterator for LimitedQueueIterMut<'a, T> where T: Default + Clone {
+impl<'a, T> Iterator for LimitedQueueIterMut<'a, T> where T: Sized {
     type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -176,10 +225,10 @@ impl<'a, T> Iterator for LimitedQueueIterMut<'a, T> where T: Default + Clone {
         }
     }
 }
-impl<T> LimitedQueueIterMut<'_, T> where T: Default + Clone {
+impl<T> LimitedQueueIterMut<'_, T> where T: Sized {
     pub fn new(source: &mut LimitedQueue<T>) -> Self {
         Self {
-            data: source.data.as_mut_ptr(),
+            data: source.data,
             p: source.front_index(),
             b: source.back_index(),
             capacity: source.capacity(),

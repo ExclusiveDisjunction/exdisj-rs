@@ -35,9 +35,13 @@ pub trait PollableMessage : Send + Sized {
 
 /// Represents a status that can be determined for restarting.
 pub trait RestartStatusBase: Send + Debug {
+    /// Determines if a task can be restarted, with no predcondition. 
     fn is_restartable(&self) -> bool;
+    /// Determines if the task can be restarted, but has a precondition for doing so. Note that if this is true, `is_restartable` is not required to be true. 
+    fn conditionally_restartable(&self) -> bool;
+    /// IF the task should not be restarted.
     fn is_non_restartable(&self) -> bool {
-        !self.is_restartable()
+        !self.is_restartable() && !self.conditionally_restartable()
     }
 }
 
@@ -631,6 +635,9 @@ mod test {
     impl RestartStatusBase for TestRestart {
         fn is_restartable(&self) -> bool {
             true
+        }
+        fn conditionally_restartable(&self) -> bool {
+            false
         }
     }
 
