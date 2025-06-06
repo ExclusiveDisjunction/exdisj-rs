@@ -22,7 +22,12 @@ aes-gcm = { version = "0.10.3", optional = true }
 rsa_ext = { version = "0.1.2", optional = true }
 sha2 = { version = "0.10.9", optional = true }
 
-windows = { version = "0.61.1", optional = true }
+windows = { version = "0.61.1", features = [
+        "Win32_Foundation",
+        "Win32_UI_WindowsAndMessaging",
+        "Win32_Graphics_Gdi",
+        "Win32_UI_Input_KeyboardAndMouse",
+    ], optional = true }
 
 [features]
 json = ["serde", "serde_json", "rsa_ext/serde"]
