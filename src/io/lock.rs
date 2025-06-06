@@ -1,4 +1,4 @@
-use super::error::PoisonError;
+use crate::error::PoisonError;
 
 use std::sync::{MutexGuard as StdMutexGuard, RwLockReadGuard, RwLockWriteGuard, Arc, RwLock, Mutex};
 use std::fmt::{Debug, Display};

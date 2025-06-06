@@ -5,13 +5,13 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use lazy_static::lazy_static;
-use serde::{Serialize, Deserialize};
 
 use crate::error::{IOError, OperationError};
-use crate::lock::{MutexProvider, OptionMutexProvider, ProtectedAccess};
+use super::lock::{MutexProvider, OptionMutexProvider, ProtectedAccess};
 
 /// Determines the level used by the logger
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[cfg_attr(feature = "json", derive(serde::Serialize, serde::Deserialize))]
 pub enum LoggerLevel {
     Debug = 1,
     Info = 2,
@@ -297,12 +297,12 @@ macro_rules! collapse_level {
     ($level: expr) => {
         {
             #[allow(unreachable_patterns)]
-            let true_level: $crate::log::LoggerLevel = match $level {
-                $crate::log::LoggerLevel::Debug => $crate::log::LoggerLevel::Debug,
-                $crate::log::LoggerLevel::Info => $crate::log::LoggerLevel::Info,
-                $crate::log::LoggerLevel::Warning => $crate::log::LoggerLevel::Warning,
-                $crate::log::LoggerLevel::Error => $crate::log::LoggerLevel::Error,
-                $crate::log::LoggerLevel::Critical => $crate::log::LoggerLevel::Critical,
+            let true_level: $crate::io::log::LoggerLevel = match $level {
+                $crate::io::log::LoggerLevel::Debug =>    $crate::io::log::LoggerLevel::Debug,
+                $crate::io::log::LoggerLevel::Info =>     $crate::io::log::LoggerLevel::Info,
+                $crate::io::log::LoggerLevel::Warning =>  $crate::io::log::LoggerLevel::Warning,
+                $crate::io::log::LoggerLevel::Error =>    $crate::io::log::LoggerLevel::Error,
+                $crate::io::log::LoggerLevel::Critical => $crate::io::log::LoggerLevel::Critical,
                 //_ => compile_error!("the type passed into this enum must be of LoggerLevel")
             };
 
@@ -322,7 +322,7 @@ macro_rules! logger_write {
             let level = $crate::collapse_level!($level);
             
             
-            $crate::log::log_global(level, contents);
+            $crate::io::log::log_global(level, contents);
         }
     };
     ($log: expr, $level: expr, $($arg:tt)*) => {
@@ -330,7 +330,7 @@ macro_rules! logger_write {
             let contents: String = format!($($arg)*);
             let level = $crate::collapse_level!($level);
 
-            $crate::log::log_direct($log, level, contents);
+            $crate::io::log::log_direct($log, level, contents);
         }
     };
 }
@@ -340,12 +340,12 @@ macro_rules! log_debug {
     ($($arg:tt)*) => {
         {
             use $crate::logger_write;
-            logger_write!($crate::log::LoggerLevel::Debug, $($arg)*)
+            logger_write!($crate::io::log::LoggerLevel::Debug, $($arg)*)
         }
     };
     ($log: expr, $($arg:tt)*) => {
         {
-            $crate::logger_write!($log, $crate::log::LoggerLevel::Debug, $($arg)*)
+            $crate::logger_write!($log, $crate::io::log::LoggerLevel::Debug, $($arg)*)
         }
     }
 }
@@ -355,12 +355,12 @@ macro_rules! log_info {
     ($($arg:tt)*) => {
         {
             use $crate::logger_write;
-            logger_write!($crate::log::LoggerLevel::Info, $($arg)*)
+            logger_write!($crate::io::log::LoggerLevel::Info, $($arg)*)
         }
     };
     ($log: expr, $($arg:tt)*) => {
         {
-            $crate::logger_write!($log, $crate::log::LoggerLevel::Info, $($arg)*)
+            $crate::logger_write!($log, $crate::io::log::LoggerLevel::Info, $($arg)*)
         }
     }
 }
@@ -370,12 +370,12 @@ macro_rules! log_warning {
     ($($arg:tt)*) => {
         {
             use $crate::logger_write;
-            logger_write!($crate::log::LoggerLevel::Warning, $($arg)*)
+            logger_write!($crate::io::log::LoggerLevel::Warning, $($arg)*)
         }
     };
     ($log: expr, $($arg:tt)*) => {
         {
-            $crate::logger_write!($log, $crate::log::LoggerLevel::Warning, $($arg)*)
+            $crate::logger_write!($log, $crate::io::log::LoggerLevel::Warning, $($arg)*)
         }
     }
 }
@@ -385,12 +385,12 @@ macro_rules! log_error {
     ($($arg:tt)*) => {
         {
             use $crate::logger_write;
-            logger_write!($crate::log::LoggerLevel::Error, $($arg)*)
+            logger_write!($crate::io::log::LoggerLevel::Error, $($arg)*)
         }
     };
     ($log: expr, $($arg:tt)*) => {
         {
-            $crate::logger_write!($log, $crate::log::LoggerLevel::Error, $($arg)*)
+            $crate::logger_write!($log, $crate::io::log::LoggerLevel::Error, $($arg)*)
         }
     }
 }
@@ -400,12 +400,12 @@ macro_rules! log_critical {
     ($($arg:tt)*) => {
         {
             use $crate::logger_write;
-            logger_write!($crate::log::LoggerLevel::Critical, $($arg)*)
+            logger_write!($crate::io::log::LoggerLevel::Critical, $($arg)*)
         }
     };
     ($log: expr, $($arg:tt)*) => {
         {
-            $crate::logger_write!($log, $crate::log::LoggerLevel::Critical, $($arg)*)
+            $crate::logger_write!($log, $crate::io::log::LoggerLevel::Critical, $($arg)*)
         }
     }
 }

@@ -2,14 +2,16 @@
     clippy::err_expect
 )]
 
-pub mod msg;
-pub mod net;
-pub mod config;
+pub mod io;
 pub mod error;
-pub mod log;
 pub mod version;
-pub mod lock;
-pub mod metric;
+pub mod raw_repr;
+
+#[cfg(feature = "auth")]
+pub mod auth;
+
+#[cfg(feature = "ui")]
+pub mod ui;
 
 #[cfg(feature="async")]
 pub mod task_util;

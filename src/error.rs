@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display};
 
+#[cfg(feature = "json")]
 use serde_json::Error as JsonError;
 
 // Way to improve: Implement std::err for all of these things.
@@ -367,16 +368,19 @@ impl Display for IOError {
 }
 
 /// Represents errors that come from Serde JSON or IO. 
+#[cfg(feature = "json")]
 #[derive(Debug)]
 pub enum ParsingError {
     Serde(JsonError),
     IO(std::io::Error)
 }
+#[cfg(feature = "json")]
 impl From<JsonError> for ParsingError {
     fn from(value: JsonError) -> Self {
         Self::Serde(value)
     }
 }
+#[cfg(feature = "json")]
 impl From<std::io::Error> for ParsingError {
     fn from(value: std::io::Error) -> Self {
         Self::IO(value)

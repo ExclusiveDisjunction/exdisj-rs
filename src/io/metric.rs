@@ -1,10 +1,10 @@
 use std::fmt::{Debug, Display};
-use serde::{Serialize, Deserialize};
 
 use crate::error::RangeError;
 
 /// A measure that uses binary values for storage (GiB)
-#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "json", derive(serde::Serialize, serde::Deserialize))]
 pub enum BinaryScale {
     Byte = 0,
     KiB = 1,
@@ -109,7 +109,8 @@ impl BinaryScale {
 }
 
 /// Represents a number with a suffix, denoting scale. 
-#[derive(Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "json", derive(serde::Serialize, serde::Deserialize))]
 pub struct BinaryNumber {
     amount: f64,
     bracket: BinaryScale,
@@ -154,7 +155,8 @@ impl BinaryNumber {
 }
 
 /// Represents a percentage between 0-100. 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "json", derive(serde::Serialize, serde::Deserialize))]
 pub struct Utilization {
     pub inner: u8,
 }

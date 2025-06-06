@@ -13,7 +13,7 @@ use std::{
     },
     string::FromUtf8Error};
 
-use crate::net::{receive_buffer, send_buffer};
+use super::net::{receive_buffer, send_buffer};
 
 pub enum SendError {
     Serde(serde_json::Error),
@@ -298,7 +298,7 @@ pub fn decode_response<T, S>(soc: &mut S) -> Result<T, DecodeError> where T: Res
 pub mod msg_async {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use crate::net::{send_buffer_async, receive_buffer_async};
+    use super::super::net::{send_buffer_async, receive_buffer_async};
 
     pub async fn send_message_async<T, S>(message: T, sok: &mut S) -> Result<(), SendError> where T: MessageBasis, S: AsyncWriteExt + Unpin {
         let serialized = to_string(&message).map_err(SendError::from)?;

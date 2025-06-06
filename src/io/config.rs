@@ -1,4 +1,3 @@
-
 use serde::{Serialize, Deserialize, ser::Error};
 use serde_json::{from_str, to_string_pretty};
 
@@ -16,14 +15,13 @@ use std::{
     fmt::Debug
 };
 
-use crate::{
-    lock::{
-        OptionRwProvider,
-        ProtectedAccess, 
-        RwProvider
-    },
-    error::ParsingError
+use super::lock::{
+    OptionRwProvider,
+    ProtectedAccess, 
+    RwProvider
 };
+
+use crate::error::ParsingError;
 
 /// Represents the a specific set of configurations that can be stored in a file, and later retreived. 
 pub trait ConfigBase: Serialize + for <'a> Deserialize<'a> + Debug { }
@@ -41,7 +39,7 @@ impl<T> Default for ConfigurationProvider<T> where T: ConfigBase {
 }
 impl<T> RwProvider for ConfigurationProvider<T> where T: ConfigBase {
     type Data = Option<T>;
-    fn access_raw(&self) -> crate::lock::ProtectedAccess<'_, Arc<RwLock<Self::Data>>> {
+    fn access_raw(&self) -> ProtectedAccess<'_, Arc<RwLock<Self::Data>>> {
         ProtectedAccess::new(&self.data)
     }
 }

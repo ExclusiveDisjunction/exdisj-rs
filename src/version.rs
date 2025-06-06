@@ -1,8 +1,8 @@
 use std::{cmp::Ordering, fmt::{Debug, Display}, str::FromStr};
-use serde::{Serialize, Deserialize};
 use crate::error::FormattingError;
 
-#[derive(PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "json", derive(serde::Serialize, serde::Deserialize))]
 pub struct Version {
     major: u16,
     minor: u16,
