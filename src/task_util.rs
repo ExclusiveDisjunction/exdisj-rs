@@ -45,6 +45,21 @@ pub trait RestartStatusBase: Send + Debug {
     }
 }
 
+impl<T, E> RestartStatusBase for Result<T, E> where T: RestartStatusBase, E: Debug + Send {
+    fn is_restartable(&self) -> bool {
+        match self {
+            Ok(v) => v.is_restartable(),
+            Err(_) => false
+        }
+    }
+    fn conditionally_restartable(&self) -> bool {
+        match self {
+            Ok(v) => v.conditionally_restartable(),
+            Err(_) => false
+        }
+    }
+}
+
 /// Representation of the success/failures of restarting a task.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RestartStatus<T: RestartStatusBase> {
