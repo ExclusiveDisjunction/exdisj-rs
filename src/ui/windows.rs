@@ -1,3 +1,4 @@
 pub mod core;
-pub mod view;
-pub mod window;
+pub mod state;
+pub mod graphics;
+pub mod gdi;
