@@ -25,7 +25,6 @@ sha2 = { version = "0.10.9", optional = true }
 windows = { version = "0.61.1", features = [
         "Win32_Foundation",
         "Win32_UI_WindowsAndMessaging",
-        "Win32_Graphics_Gdi",
         "Win32_UI_Input_KeyboardAndMouse",
     ], optional = true }
 
@@ -35,3 +34,9 @@ auth = ["aes-gcm", "rsa_ext", "sha2"]
 async = ["tokio", "futures"]
 ui = ["serde", "serde_json"]
 win_ui = ["windows"]
+gdi_graphics = ["windows/Win32_Graphics_Gdi"]
+gdi_plus_graphics = ["windows/Win32_Graphics_GdiPlus"]
+direct_graphics = ["windows/Win32_Graphics_Dxgi", "windows/Win32_Graphics_Direct2D", "windows/Win32_Graphics_Direct2D_Common", "windows/Win32_Graphics_DirectWrite", "windows/Win32_Graphics_DirectComposition"]
+direct3d_graphics = ["direct_graphics", "windows/Win32_Graphics_Direct3D9", "windows/Win32_Graphics_Direct3D11" ]
+
+standard_ui = ["ui", "win_ui", "direct_graphics"]
