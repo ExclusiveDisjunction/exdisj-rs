@@ -15,6 +15,7 @@ use windows::Win32::Graphics::Direct3D9::D3DCOLORVALUE;
 /// For example, if the gdi_graphics feature is enabled, `Into<COLORREF>` will be provided. 
 /// This type can also be used to hash, so it can be used in a `HashMap` as the key to a resolved resource.
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
+#[cfg_attr(feature = "json", derive(serde::Serialize, serde::Deserialize))]
 pub struct ColorResource {
     data: [u8; 4] //red, green, blue, alpha
 }
@@ -76,6 +77,37 @@ impl ColorResource {
     }
 }
 
+
+pub struct FontStyle {
+
+}
+
+pub struct PenStyle<T> {
+    width: T,
+    color: ColorResource
+}
+impl<T> PenStyle<T> {
+    pub fn new(color: ColorResource, width: T) -> Self {
+        Self {
+            width,
+            color
+        }
+    }
+
+    pub fn width(&self) -> &T {
+        &self.width
+    }
+    pub fn set_width(&mut self, new: T) {
+        self.width = new
+    }
+    pub fn color(&self) -> &ColorResource {
+        &self.color
+    }
+    pub fn set_color(&mut self, new: ColorResource) {
+        self.color = new
+    }
+}
+
 pub enum StyleAccess {
     Background,
     Border,
@@ -83,44 +115,15 @@ pub enum StyleAccess {
     Foreground
 }
 
-pub trait StyleBook {
-    type Storage;
-
-    fn get(&self, rc: StyleAccess) -> &Self::Storage;
-    fn get_mut(&mut self, rc: StyleAccess) -> &mut Self::Storage;
-}
-
-pub struct StyleTemplate {
-    id: u32,
+pub struct StyleRequest {
     background: ColorResource,
     border: ColorResource,
     accent: ColorResource,
     foreground: ColorResource
 }
-impl StyleBook for StyleTemplate {
-    type Storage = ColorResource;
-
-    fn get(&self, rc: StyleAccess) -> &ColorResource {
-        match rc {
-            StyleAccess::Accent => &self.accent,
-            StyleAccess::Border => &self.border,
-            StyleAccess::Foreground => &self.foreground,
-            StyleAccess::Background=> &self.background
-        }
-    }
-    fn get_mut(&mut self, rc: StyleAccess) -> &mut ColorResource {
-        match rc {
-            StyleAccess::Accent => &mut self.accent,
-            StyleAccess::Border => &mut self.border,
-            StyleAccess::Foreground => &mut self.foreground,
-            StyleAccess::Background => &mut self.background
-        }
-    }
-}
-impl StyleTemplate {
-    pub fn new(id: u32, background: ColorResource, border: ColorResource, accent: ColorResource, foreground: ColorResource) -> Self {
+impl StyleRequest {
+    pub fn new(background: ColorResource, border: ColorResource, accent: ColorResource, foreground: ColorResource) -> Self {
         Self {
-            id,
             background,
             border,
             accent,
@@ -128,7 +131,20 @@ impl StyleTemplate {
         }
     }
 
-    pub fn id(&self) -> u32 {
-        self.id
+    pub fn get(&self, rc: StyleAccess) -> &ColorResource {
+        match rc {
+            StyleAccess::Accent => &self.accent,
+            StyleAccess::Border => &self.border,
+            StyleAccess::Foreground => &self.foreground,
+            StyleAccess::Background=> &self.background
+        }
+    }
+    pub fn get_mut(&mut self, rc: StyleAccess) -> &mut ColorResource {
+        match rc {
+            StyleAccess::Accent => &mut self.accent,
+            StyleAccess::Border => &mut self.border,
+            StyleAccess::Foreground => &mut self.foreground,
+            StyleAccess::Background => &mut self.background
+        }
     }
 }

@@ -6,8 +6,11 @@ use windows::Win32::Foundation::COLORREF;
 use windows::Win32::Graphics::Gdi::{CreateSolidBrush, DeleteObject, RoundRect, SetBkMode, HGDIOBJ, TRANSPARENT};
 use windows::Win32::{Foundation::{HWND, RECT}, Graphics::Gdi::{BeginPaint, EndPaint, FillRect, HBRUSH, HDC, HFONT, PAINTSTRUCT}, UI::WindowsAndMessaging::GetWindowRect};
 
-use super::graphics::{ResourceKey, GraphicsFrameContext, GraphicsViewContext, GraphicsWindowContext, GraphicsAppContext, GraphicsEngine, GraphicsResourceBook, FontStyle};
-use crate::ui::tool::utf_str::Utf16String;
+use crate::ui::windows::rc::ResourceBook;
+
+use super::graphics::{ResourceKey, GraphicsFrameContext, GraphicsViewContext, GraphicsWindowContext, GraphicsAppContext, GraphicsEngine, GraphicsResourceBook};
+use super::style::{ColorResource, PenStyle};
+//use crate::ui::tool::utf_str::Utf16String;
 
 #[derive(Debug)]
 pub enum GdiError {
@@ -28,7 +31,6 @@ pub struct GdiFrameContext {
     rc: Rc<GdiResourceBook>,
     ps: PAINTSTRUCT,
     hdc: HDC,
-    rect: RECT,
     wnd: HWND
 }
 impl GraphicsFrameContext for GdiFrameContext {
@@ -36,37 +38,24 @@ impl GraphicsFrameContext for GdiFrameContext {
     type Unit = i32;
     type Rect = RECT;
     
-    fn draw_bk(&mut self, color: ResourceKey) -> Result<(), Self::Error> {
-        self.draw_rect(self.rect.clone(), None, color)
-    }
-    fn draw_rect(&mut self, size: Self::Rect, radius: Option<Self::Unit>, color: ResourceKey) -> Result<(), Self::Error> {
-        let brush = match self.rc.get_color(&color) {
-            Some(b) => b.clone(),
-            None => return Err( GdiError::MissingResource(color) )
-        };
-
-        unsafe {
-            if let Some(r) = radius {
-                todo!()
-                //RoundRect(hdc, left, top, right, bottom, width, height)
-            }
-            else {
-                FillRect(self.hdc, &size, brush);
-            }
-        }
-
-        Ok( () ) 
-    }
-    fn draw_frame(&mut self, size: Self::Rect, radius: Option<Self::Unit>, thickness: Self::Unit, color: ResourceKey, bk: ResourceKey) -> Result<(), Self::Error> {
+    fn bind_background(&mut self, color: Option<ColorResource>) -> Result<(), Self::Error> {
         todo!()
     }
-    fn draw_circle(&mut self, radius: Self::Unit, x: Self::Unit, y: Self::Unit, color: ResourceKey) -> Result<(), Self::Error> {
+    fn bind_pen(&mut self, style: Option<PenStyle<Self::Unit>>) -> Result<(), Self::Error> {
         todo!()
     }
     
-    fn write_text(&mut self, text: &Utf16String, x: Self::Unit, y: Self::Unit, style: FontStyle) -> Result<(), Self::Error> {
+    fn draw_rect(&mut self, size: Self::Rect, radius: Option<Self::Unit>, fill: bool) -> Result<(), Self::Error> {
         todo!()
     }
+    fn draw_ellipse(&mut self, width: Self::Unit, height: Self::Unit, center: (Self::Unit, Self::Unit)) -> Result<(), Self::Error> {
+        todo!()
+    }
+    fn draw_line(&mut self, start: (Self::Unit, Self::Unit), to: (Self::Unit, Self::Unit)) -> Result<(), Self::Error> {
+        todo!()
+    }
+    
+    
 }
 impl Drop for GdiFrameContext {
     fn drop(&mut self) {
@@ -80,42 +69,38 @@ pub struct GdiViewContext {
     rc: Rc<GdiResourceBook>,
     target: HWND
 }
-impl GraphicsViewContext for GdiViewContext {
+impl GraphicsViewContext<GdiResourceBook> for GdiViewContext {
     type Error = GdiError;
     type Frame = GdiFrameContext;
 
     fn make_frame(&mut self) -> Result<Self::Frame, Self::Error> {
+        let ps: PAINTSTRUCT;
+        let dc: HDC;
+
         unsafe {
             let mut ps_box: Box<MaybeUninit<PAINTSTRUCT>> = Box::new_uninit();
-            let mut rect_box: Box<MaybeUninit<RECT>> = Box::new_uninit();
 
-            let dc = BeginPaint(self.target, ps_box.as_mut_ptr());
-            if let Err(e) = GetWindowRect(self.target, rect_box.as_mut_ptr()) {
-                return Err( GdiError::Windows(e) )
-            }
-
-            let ps = *ps_box.assume_init();
-            let rect = *rect_box.assume_init();
+            dc = BeginPaint(self.target, ps_box.as_mut_ptr());
+            ps = *ps_box.assume_init();
 
             SetBkMode(dc, TRANSPARENT);
-
-            Ok(
-                Self::Frame {
-                    rc: Rc::clone(&self.rc),
-                    ps,
-                    hdc: dc,
-                    rect,
-                    wnd: self.target
-                }
-            )
         }
+
+        Ok(
+            Self::Frame {
+                rc: Rc::clone(&self.rc),
+                ps,
+                hdc: dc,
+                wnd: self.target
+            }
+        )
     }
 }
 
 pub struct GdiWindowContext {
     rc: Rc<GdiResourceBook>
 }
-impl GraphicsWindowContext for GdiWindowContext {
+impl GraphicsWindowContext<GdiResourceBook> for GdiWindowContext {
     type Error = GdiError;
     type ViewContext = GdiViewContext;
 
@@ -133,15 +118,31 @@ pub struct GdiResourceBook {
     colors: HashMap<ResourceKey, HBRUSH>,
     fonts: HashMap<ResourceKey, HFONT>
 }
-impl GraphicsResourceBook for GdiResourceBook {
+impl ResourceBook for GdiResourceBook {
     type Color = HBRUSH;
     type Font = HFONT;
-
-    fn get_color(&self, key: &ResourceKey) -> Option<&Self::Color> {
-        self.colors.get(&key)
+    type Error = GdiError;
+    
+    fn make_from_template(&mut self, style: super::style::StyleRequest) -> Result<(), Self::Error> {
+        todo!()
     }
-    fn get_font(&self, key: &ResourceKey) -> Option<&Self::Font> {
-        self.fonts.get(&key)
+    fn make_color(&mut self, key: ColorResource) -> Result<(), Self::Error> {
+        todo!()
+    }
+    
+    fn remove_color(&mut self, key: ColorResource) -> bool {
+        todo!()
+    }
+    
+    fn get_special(&self, key: super::rc::SpecialColors) -> Option<&Self::Color> {
+        todo!()
+    }
+    
+    fn get(&self, key: &ColorResource) -> Option<&Self::Color> {
+        todo!()
+    }
+    fn get_mut(&mut self, key: &ColorResource) -> Option<&Self::Font> {
+        todo!()
     }
 }
 impl Drop for GdiResourceBook {
@@ -192,7 +193,7 @@ impl GdiResourceBook {
 pub struct GdiAppContext {
     rc: Rc<GdiResourceBook>
 }
-impl GraphicsAppContext for GdiAppContext {
+impl GraphicsAppContext<GdiResourceBook> for GdiAppContext {
     type Error = GdiError;
     type WindowContext = GdiWindowContext;
     
@@ -207,6 +208,7 @@ pub struct GdiEngine;
 impl GraphicsEngine for GdiEngine {
     type Error = GdiError;
     type AppContext = GdiAppContext;
+    type Resource = GdiResourceBook;
 
     fn make_app_context(self) -> Result<Self::AppContext, Self::Error> {
         let rc = Rc::new(GdiResourceBook::default());
