@@ -3,25 +3,24 @@ use std::{collections::HashMap, fmt::Display};
 use std::mem::MaybeUninit;
 
 use windows::Win32::Foundation::COLORREF;
-use windows::Win32::Graphics::Gdi::{CreateSolidBrush, DeleteObject, RoundRect, SetBkMode, HGDIOBJ, TRANSPARENT};
+use windows::Win32::Graphics::Gdi::{CreateSolidBrush, DeleteObject, RoundRect, SetBkMode, HGDIOBJ, HPEN, TRANSPARENT};
+use windows::Win32::Graphics::GdiPlus::Color;
 use windows::Win32::{Foundation::{HWND, RECT}, Graphics::Gdi::{BeginPaint, EndPaint, FillRect, HBRUSH, HDC, HFONT, PAINTSTRUCT}, UI::WindowsAndMessaging::GetWindowRect};
 
-use crate::ui::windows::rc::ResourceBook;
-
-use super::graphics::{ResourceKey, GraphicsFrameContext, GraphicsViewContext, GraphicsWindowContext, GraphicsAppContext, GraphicsEngine, GraphicsResourceBook};
-use super::style::{ColorResource, PenStyle};
-//use crate::ui::tool::utf_str::Utf16String;
+use super::super::rc::ResourceBook;
+use super::super::base::{GraphicsFrameContext, GraphicsViewContext, GraphicsWindowContext, GraphicsAppContext, GraphicsEngine};
+use super::super::style::{ColorResource, PenStyle};
 
 #[derive(Debug)]
 pub enum GdiError {
     Windows(windows::core::Error),
-    MissingResource(ResourceKey)
+    MissingColor(ColorResource)
 }
 impl Display for GdiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Windows(win) => write!(f, "windows error: '{win}'"),
-            Self::MissingResource(rc) => write!(f, "missing resource, key: '{rc}'")
+            Self::MissingColor(rc) => write!(f, "missing color, ARGB hex: '{rc}'")
         }
     }
 }
@@ -33,15 +32,16 @@ pub struct GdiFrameContext {
     hdc: HDC,
     wnd: HWND
 }
-impl GraphicsFrameContext for GdiFrameContext {
+impl GraphicsFrameContext<GdiResourceBook> for GdiFrameContext {
     type Error = GdiError;
     type Unit = i32;
     type Rect = RECT;
     
-    fn bind_background(&mut self, color: Option<ColorResource>) -> Result<(), Self::Error> {
+    fn bind_background(&mut self, color: Option<&<GdiResourceBook as ResourceBook>::Brush>) -> Result<(), Self::Error> {
         todo!()
     }
-    fn bind_pen(&mut self, style: Option<PenStyle<Self::Unit>>) -> Result<(), Self::Error> {
+    
+    fn bind_pen(&mut self, pen: Option<&<GdiResourceBook as ResourceBook>::Pen>) -> Result<(), Self::Error> {
         todo!()
     }
     
@@ -55,7 +55,9 @@ impl GraphicsFrameContext for GdiFrameContext {
         todo!()
     }
     
-    
+    fn draw_circle(&mut self, radius: Self::Unit, center: (Self::Unit, Self::Unit)) -> Result<(), Self::Error> where Self::Unit: Clone{
+        self.draw_ellipse(radius.clone(), radius, center)
+    }    
 }
 impl Drop for GdiFrameContext {
     fn drop(&mut self) {
@@ -115,38 +117,48 @@ impl GraphicsWindowContext<GdiResourceBook> for GdiWindowContext {
 }
 
 pub struct GdiResourceBook {
-    colors: HashMap<ResourceKey, HBRUSH>,
-    fonts: HashMap<ResourceKey, HFONT>
+    colors: HashMap<ColorResource, HBRUSH>,
+    //fonts: HashMap<ResourceKey, HFONT>
 }
 impl ResourceBook for GdiResourceBook {
-    type Color = HBRUSH;
+    type Brush = HBRUSH;
+    type Pen = HPEN;
     type Font = HFONT;
     type Error = GdiError;
     
-    fn make_from_template(&mut self, style: super::style::StyleRequest) -> Result<(), Self::Error> {
+    fn include_style(&mut self, style: crate::ui::windows::graphics::style::StyleRequest) -> Result<(), Self::Error> {
         todo!()
     }
+
     fn make_color(&mut self, key: ColorResource) -> Result<(), Self::Error> {
         todo!()
     }
-    
     fn remove_color(&mut self, key: ColorResource) -> bool {
         todo!()
     }
     
-    fn get_special(&self, key: super::rc::SpecialColors) -> Option<&Self::Color> {
+    fn get_special(&self, key: crate::ui::windows::graphics::rc::SpecialColors) -> Option<&Self::Brush> {
         todo!()
     }
     
-    fn get(&self, key: &ColorResource) -> Option<&Self::Color> {
+    fn get(&self, key: &ColorResource) -> Option<&Self::Brush> {
         todo!()
     }
     fn get_mut(&mut self, key: &ColorResource) -> Option<&Self::Font> {
         todo!()
     }
+    
+    fn make_pen<U>(&mut self, key: ColorResource, size: U) -> Result<(), Self::Error> {
+        todo!()
+    }
+    fn get_pen<U>(&self, key: ColorResource, size: U) -> Option<&Self::Pen> {
+        todo!()
+    }
 }
 impl Drop for GdiResourceBook {
     fn drop(&mut self) {
+        todo!();
+        /*
         let colors_iter = self.colors.values()
             .cloned()
             .map(|x| { let x: HGDIOBJ = x.into(); x } );
@@ -160,18 +172,19 @@ impl Drop for GdiResourceBook {
                     let _ = DeleteObject(x);
                 });
         }
+         */
     }
 }
 impl Default for GdiResourceBook {
     fn default() -> Self {
         Self {
             colors: HashMap::new(),
-            fonts: HashMap::new()
+            //fonts: HashMap::new()
         }
     }
 }
 impl GdiResourceBook {
-    pub fn register_color(&mut self, key: ResourceKey, value: COLORREF) {
+    pub fn register_color(&mut self, key: ColorResource, value: COLORREF) {
         let brush: HBRUSH;
         unsafe {
             brush = CreateSolidBrush(value);
@@ -179,7 +192,7 @@ impl GdiResourceBook {
 
         self.register_brush(key, brush);
     }
-    pub fn register_brush(&mut self, key: ResourceKey, brush: HBRUSH) {
+    pub fn register_brush(&mut self, key: ColorResource, brush: HBRUSH) {
         if let Some(old) = self.colors.insert(key, brush) {
             //We must delete the old brush
             let obj: HGDIOBJ = old.into();

@@ -10,6 +10,8 @@ use windows::Win32::Graphics::Direct2D::Common::D2D1_COLOR_F;
 #[cfg(feature = "direct3d_graphics")]
 use windows::Win32::Graphics::Direct3D9::D3DCOLORVALUE;
 
+use std::fmt::Display;
+
 /// A graphics engine independent encoding a color. Colors can be represented with alpha. Values are stored from 0-255. 
 /// Depending on features includes on the library, implementations of `Into` will be provided. 
 /// For example, if the gdi_graphics feature is enabled, `Into<COLORREF>` will be provided. 
@@ -18,6 +20,11 @@ use windows::Win32::Graphics::Direct3D9::D3DCOLORVALUE;
 #[cfg_attr(feature = "json", derive(serde::Serialize, serde::Deserialize))]
 pub struct ColorResource {
     data: [u8; 4] //red, green, blue, alpha
+}
+impl Display for ColorResource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "0x{:X}{:X}{:X}{:X}", self.data[0], self.data[1], self.data[2], self.data[3])   
+    }
 }
 #[cfg(feature = "gdi_graphics")]
 impl Into<COLORREF> for ColorResource {

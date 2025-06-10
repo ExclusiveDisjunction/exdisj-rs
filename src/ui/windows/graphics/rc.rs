@@ -1,4 +1,4 @@
-use crate::ui::windows::style::{StyleRequest, ColorResource, StyleAccess};
+use super::style::{StyleAccess, ColorResource, StyleRequest};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum SpecialColors {
@@ -11,12 +11,13 @@ pub enum SpecialColors {
 }
 
 pub trait ResourceBook {
-    type Color;
+    type Brush;
+    type Pen;
     type Font;
     type Error;
 
-    fn make_from_template(&mut self, style: StyleRequest) -> Result<(), Self::Error>;
-    fn get_colors<'a>(&'a self, style: &StyleRequest) -> Option<ResolvedStyle<'a, Self::Color>> where Self::Color: 'a {
+    fn include_style(&mut self, style: StyleRequest) -> Result<(), Self::Error>;
+    fn get_style<'a>(&'a self, style: &StyleRequest) -> Option<ResolvedStyle<'a, Self::Brush>> where Self::Brush: 'a {
         let bk = self.get(style.get(StyleAccess::Background))?;
         let border = self.get(style.get(StyleAccess::Border))?;
         let accent = self.get(style.get(StyleAccess::Accent))?;
@@ -35,22 +36,13 @@ pub trait ResourceBook {
     fn make_color(&mut self, key: ColorResource) -> Result<(), Self::Error>;
     fn remove_color(&mut self, key: ColorResource) -> bool;
 
-    fn get_special(&self, key: SpecialColors) -> Option<&Self::Color>;
+    fn get_special(&self, key: SpecialColors) -> Option<&Self::Brush>;
 
-    fn get(&self, key: &ColorResource) -> Option<&Self::Color>;
+    fn get(&self, key: &ColorResource) -> Option<&Self::Brush>;
     fn get_mut(&mut self, key: &ColorResource) -> Option<&Self::Font>;
-}
-pub trait PenResourceBook : ResourceBook {
-    type Pen;
 
-    fn make_pen_template<'a, U>(&'a self, color: &ColorResource, width: U) -> ResolvedPenTemplate<'a, Self::Color, U>;
-}
-
-/// Represents a construct to build a ready to use pen. 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ResolvedPenTemplate<'a, C, U> where C: 'a{
-    width: U,
-    color: &'a C
+    fn make_pen<U>(&mut self, key: ColorResource, size: U) -> Result<(), Self::Error>;
+    fn get_pen<U>(&self, key: ColorResource, size: U) -> Option<&Self::Pen>;
 }
 
 /// A color guide provides the ability for someone to have a basis around a set of colors.

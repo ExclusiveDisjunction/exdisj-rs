@@ -35,7 +35,7 @@ async = ["tokio", "futures"]
 ui = ["serde", "serde_json"]
 win_ui = ["windows"]
 gdi_graphics = ["windows/Win32_Graphics_Gdi"]
-gdi_plus_graphics = ["windows/Win32_Graphics_GdiPlus"]
+gdi_plus_graphics = ["gdi_graphics", "windows/Win32_System_LibraryLoader", "windows/Win32_System_Services", "windows/Win32_Graphics_GdiPlus"]
 direct_graphics = ["windows/Win32_Graphics_Dxgi", "windows/Win32_Graphics_Direct2D", "windows/Win32_Graphics_Direct2D_Common", "windows/Win32_Graphics_DirectWrite", "windows/Win32_Graphics_DirectComposition"]
 direct3d_graphics = ["direct_graphics", "windows/Win32_Graphics_Direct3D9", "windows/Win32_Graphics_Direct3D11" ]
 
