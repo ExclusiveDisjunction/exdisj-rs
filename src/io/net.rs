@@ -54,7 +54,6 @@ pub mod net_async {
     use tokio::pin;
 
     use super::*;
-    use crate::log_debug;
 
     pub async fn read_file_contents_async<P>(path: P) -> Result<String, std::io::Error> where P: AsRef<Path> {
         let mut file = AsyncFile::open(path).await?;
@@ -88,15 +87,12 @@ pub mod net_async {
         sock.read_exact(&mut len_buff).await?;
 
         let len = u32::from_be_bytes(len_buff) as usize;
-        log_debug!("(Tool) Decoding {len} bytes from stream.");
-
 
         loop {
             let bytes_read = sock.read(temp_buffer.deref_mut()).await?;
 
             dest.extend_from_slice(&temp_buffer[..bytes_read]);
 
-            log_debug!("(Tool) Got {bytes_read} from stream.");
             if bytes_read == 0 || dest.len() == len {
                 break; //Connection closed or no more data
             }

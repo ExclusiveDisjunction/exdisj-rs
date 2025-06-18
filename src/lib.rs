@@ -7,6 +7,8 @@ pub mod error;
 pub mod version;
 pub mod raw_repr;
 
+pub mod network;
+
 #[cfg(feature = "auth")]
 pub mod auth;
 
