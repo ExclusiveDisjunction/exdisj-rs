@@ -1,29 +1,57 @@
 use std::{cmp::Ordering, fmt::{Debug, Display}, str::FromStr};
-use crate::error::FormattingError;
+use std::ops::Index;
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum VersionField {
+    Major,
+    Minor,
+    Build
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum VersionParsingError<T> where T: FromStr {
+    TooManyParts,
+    TooFewParts,
+    InvalidPart(T::Err)
+}
+impl<T> Display for VersionParsingError<T> where T: FromStr, <T as FromStr>::Err: Display {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TooManyParts => write!(f, "too many parts (expects 3)"),
+            Self::TooFewParts => write!(f, "too few parts (expects 3)"),
+            Self::InvalidPart(x) => write!(f, "a sub-part could not be parsed, with error '{x}'")
+        }
+    }
+}
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "json", derive(serde::Serialize, serde::Deserialize))]
-pub struct Version {
-    major: u16,
-    minor: u16,
-    build: u16
+pub struct Version<T>  {
+    major: T,
+    minor: T,
+    build: T
 }
-impl Debug for Version {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        (self as &dyn Display).fmt(f)
+impl<T> From<Version<T>> for [T; 3] {
+    fn from(value: Version<T>) -> Self {
+        [value.major, value.minor, value.build]       
     }
 }
-impl Display for Version {
+impl<T> Debug for Version<T> where T: Debug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{ major: {:?}, minor: {:?}, build: {:?} }}", &self.major, &self.minor, &self.build)
+    }
+}
+impl<T> Display for Version<T> where T: Display {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}.{}.{}", self.major, self.minor, self.build)
     }
 }
-impl PartialOrd for Version {
+impl<T> PartialOrd for Version<T> where T: Ord {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
-impl Ord for Version {
+impl<T> Ord for Version<T> where T: Ord {
     fn cmp(&self, other: &Self) -> Ordering {
         if self == other {
             Ordering::Equal
@@ -45,43 +73,54 @@ impl Ord for Version {
         }
     }
 }
-impl FromStr for Version {
-    type Err = FormattingError;
+impl<T> FromStr for Version<T> where T: FromStr {
+    type Err = VersionParsingError<T>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = [String::new(), String::new(), String::new()];
-        let mut i = 0usize;
-        for l in s.chars() {
-            match l {
-                '.' => {
-                    if i + 1 >= parts.len() { //Too many periods!
-                        return Err(FormattingError::new(&s, "too many periods contained"));
-                    }
-                    i += 1;
-                },
-                _ if l.is_numeric() => {
-                    parts[i].push(l);
-                },
-                _ => return Err(FormattingError::new(&s, format!("unrecognized token '{}'", l)))
-            }
+        let parts: Vec<&str> = s.split('.').map(|x| x.trim()).collect();
+        if parts.len() == 3 {
+            Ok (
+                Self {
+                    major: parts[0].parse().map_err(|x| VersionParsingError::InvalidPart(x))?,
+                    minor: parts[1].parse().map_err(|x| VersionParsingError::InvalidPart(x))?,
+                    build: parts[2].parse().map_err(|x| VersionParsingError::InvalidPart(x))?
+                }
+            )
         }
-
-        let major_try: Result<u16, _> = parts[0].parse();
-        let minor_try: Result<u16, _> = parts[1].parse();
-        let build_try: Result<u16, _> = parts[2].parse();
-
-        match (major_try, minor_try, build_try) {
-            (Ok(ma), Ok(mi), Ok(bd)) => Ok(Self::new(ma, mi, bd)),
-            _ => Err(FormattingError::new(&s, "one or more sub-parts could not be expressed as a u16"))
+        else if parts.len() < 3 {
+            Err(VersionParsingError::TooFewParts)
+        }
+        else {
+            Err(VersionParsingError::TooManyParts)
         }
     }
 }
-impl Version {
-    pub const fn new(major: u16, minor: u16, build: u16) -> Self {
+impl<T> Index<VersionField> for Version<T> {
+    type Output = T;
+    fn index(&self, index: VersionField) -> &Self::Output {
+        match index {
+            VersionField::Major => &self.major,
+            VersionField::Minor => &self.minor,
+            VersionField::Build => &self.build
+        }
+    }
+}
+impl<T> Version<T> {
+    pub const fn new(major: T, minor: T, build: T) -> Self {
         Self {
             major,
             minor,
             build
         }
+    }
+
+    pub fn major(&self) -> &T {
+        &self.major
+    }
+    pub fn minor(&self) -> &T {
+        &self.minor
+    }
+    pub fn build(&self) -> &T {
+        &self.build
     }
 }
 
@@ -112,9 +151,9 @@ pub fn test_version_functions() {
     assert_eq!(list, vec![v5, v1, v4, v6, v2, v3, v7]);
 
     let v1_str: String = v1.to_string();
-    let v1_decoded: Result<Version, _> = v1_str.parse();
+    let v1_decoded: Result<Version<_>, _> = v1_str.parse();
     assert_eq!(v1_decoded.unwrap(), v1);
 
-    let dummy_decoded: Result<Version, _> = ".4.0".parse();
+    let dummy_decoded: Result<Version<i32>, _> = ".4.0".parse();
     assert!(dummy_decoded.is_err());
 }

@@ -278,9 +278,8 @@ pub fn log_global(level: LoggerLevel, contents: String) {
     }
 
     let mut lock = LOG.access();
-    match lock.access_mut() {
-        Some(v) => log_direct(v, level, contents),
-        None => return
+    if let Some(v) = lock.access_mut() {
+        log_direct(v, level, contents)
     }
 }
 pub fn log_direct(logger: &mut LoadedLogger, level: LoggerLevel, contents: String) {
